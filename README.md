@@ -36,7 +36,7 @@ Download and install [Arduino IDE 2.x](https://www.arduino.cc/en/software).
    https://espressif.github.io/arduino-esp32/package_esp32_index.json
    ```
 3. Go to **Tools → Board → Boards Manager**, search for **esp32**, and install **esp32 by Espressif Systems**
-4. Select **Tools → Board → esp32 → ESP32C6 Dev Module**
+4. Select **Tools → Board → esp32 → SparkFun esp32-c6 Thing Plus**
 
 ### 3. Install Required Libraries
 
@@ -126,6 +126,83 @@ The SEN66 measures 9 environmental parameters:
 
 ---
 
+## Air Quality Thresholds
+
+These are the thresholds used by Ambient Works to categorise air quality. Use them in the example sketches to set LED colours or trigger alerts for any pollutant.
+
+### PM2.5 (µg/m³)
+
+| Level | Range | Description |
+|---|---|---|
+| 🟢 Good | 0 – 12 | Clean air, no action needed |
+| 🟡 Moderate | 12 – 35 | Acceptable for most people |
+| 🟠 Poor | 35 – 140 | May affect sensitive individuals |
+| 🔴 Severe | > 140 | Unhealthy — reduce exposure |
+
+### PM10 (µg/m³)
+
+| Level | Range | Description |
+|---|---|---|
+| 🟢 Good | 0 – 45 | Clean air |
+| 🟡 Moderate | 45 – 75 | Acceptable |
+| 🟠 Poor | 75 – 150 | Elevated coarse particles |
+| 🔴 Severe | > 150 | Unhealthy |
+
+### CO₂ (ppm)
+
+| Level | Range | Description |
+|---|---|---|
+| 🟢 Good | 400 – 1000 | Well ventilated |
+| 🟡 Moderate | 1000 – 1500 | Room could use fresh air |
+| 🟠 Poor | 1500 – 5000 | Stuffy — open a window |
+| 🔴 Severe | > 5000 | Dangerous — ventilate immediately |
+
+### VOC Index
+
+| Level | Range | Description |
+|---|---|---|
+| 🟢 Good | 0 – 150 | Low volatile organic compounds |
+| 🟡 Moderate | 150 – 250 | Noticeable odours possible |
+| 🟠 Poor | 250 – 450 | High VOC — check for sources |
+| 🔴 Severe | > 450 | Very high — ventilate and investigate |
+
+### NOx Index
+
+| Level | Range | Description |
+|---|---|---|
+| 🟢 Good | 0 – 20 | Clean air |
+| 🟡 Moderate | 20 – 100 | Slightly elevated |
+| 🟠 Poor | 100 – 400 | High — possible combustion source |
+| 🔴 Severe | > 400 | Very high — ventilate |
+
+### Temperature (°C) & Humidity (%RH)
+
+| Level | Temperature | Humidity |
+|---|---|---|
+| 🟢 Comfortable | < 25°C | < 60% |
+| 🟡 Warm / Humid | 25 – 30°C | 60 – 70% |
+| 🟠 Hot / Very Humid | 30 – 35°C | 70 – 80% |
+| 🔴 Very Hot / Excessive | > 35°C | > 80% |
+
+### Using thresholds in code
+
+The example sketch uses PM2.5 by default — swap the variable and thresholds to monitor any pollutant:
+
+```cpp
+// Example: CO2 alert instead of PM2.5
+if (co2 < 1000) {
+  pixel.setPixelColor(0, pixel.Color(0, 255, 0));     // Green
+} else if (co2 < 1500) {
+  pixel.setPixelColor(0, pixel.Color(255, 180, 0));   // Yellow
+} else if (co2 < 5000) {
+  pixel.setPixelColor(0, pixel.Color(255, 80, 0));    // Orange
+} else {
+  pixel.setPixelColor(0, pixel.Color(255, 0, 0));     // Red
+}
+```
+
+---
+
 ## 3D-Printed Enclosure
 
 STL files for the enclosure are in the [`3d-files/`](3d-files/) folder.
@@ -146,19 +223,27 @@ STL files for the enclosure are in the [`3d-files/`](3d-files/) folder.
 | **Sensor not found / I²C error** | Check Qwiic cable is seated firmly on both ends |
 | **All readings show 0 or 65535** | Sensor is still warming up — wait 60 seconds |
 | **LED doesn't light up** | Verify the correct board is selected in the `#define` at the top |
-| **Upload fails** | Hold the **BOOT** button on the SparkFun board while uploading |
+| **Upload fails** | See the **Manual Boot Mode** section below |
 
----
+### Manual Boot Mode (Upload Fails)
 
-## Project Ideas
+If uploading fails with a connection error, you need to put the board into **boot mode** manually. The **BOOT** and **RESET** buttons are on the back of the SparkFun board:
 
-Once you're comfortable with the basics, try these:
+<p align="center">
+  <img src="images/sparkfun-c6-buttons.jpg" alt="SparkFun ESP32-C6 rear — BOOT and RESET buttons" width="500">
+</p>
 
-- 📊 **Classroom air quality map** — Place kits around a building and compare readings
-- 🍳 **Cooking emissions study** — Monitor PM2.5 before, during, and after cooking
-- 🚗 **Traffic pollution tracker** — Log data near roads at different times of day
-- 🪴 **Plant room vs office** — Compare VOC and CO₂ levels in different environments
-- 😮‍💨 **Breathing experiment** — Watch CO₂ rise when people enter a closed room
+> **Note:** Photo placeholder — replace `images/sparkfun-c6-buttons.jpg` with an actual photo of the board's rear showing the buttons.
+
+**Steps:**
+
+1. Press and **hold** the **BOOT** button (keep holding it)
+2. While still holding BOOT, press and **release** the **RESET** button
+3. **Release** the BOOT button
+4. The board is now in boot mode — click **Upload** in Arduino IDE
+5. After upload completes, press **RESET** once to start your sketch
+
+You only need to do this if the normal upload doesn't work. Once the sketch is running, future uploads usually work without manual boot mode.
 
 ---
 
