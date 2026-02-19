@@ -50,6 +50,7 @@
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPmDNS.h>
 #include <LittleFS.h>
 
 // ── History / Logging ────────────────────────────────────────
@@ -321,6 +322,13 @@ void setup() {
   Serial.println("\nWiFi connected.");
   Serial.println("SSID: " + String(ssid));
 
+  // mDNS — device reachable at http://ambient.local
+  if (MDNS.begin("ambient")) {
+    Serial.println("mDNS responder started: http://ambient.local/api");
+  } else {
+    Serial.println("mDNS responder failed to start");
+  }
+
   // Sync time (for api timestamp)
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 
@@ -405,7 +413,8 @@ void setup() {
   server.begin();
   Serial.print("Web server started on: http://");
   Serial.print(WiFi.localIP());
-  Serial.print("/api");
+  Serial.println("/api");
+  Serial.print("                   or: http://ambient.local/api");
 
   Serial.println();
 

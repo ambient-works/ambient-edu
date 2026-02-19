@@ -1,5 +1,5 @@
 // ── Config ──────────────────────────────────────────────────────────────────
-let deviceIp     = "192.168.0.1337";
+let deviceIp     = "ambient.local";
 const UPDATE_MS  = 2000;
 const MAX_HIST   = 120;
 
