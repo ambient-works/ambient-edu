@@ -240,6 +240,28 @@ void handleHistoryJson() {
   f.close();
 }
 
+// GET /api/history/length — get history length (number of entries).
+void handleHistoryLength() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!lfsAvailable) {
+    server.send(503, "application/json", jsonError("Filesystem unavailable"));
+    return;
+  }
+  if (!LittleFS.exists(LOG_FILE)) {
+    server.send(200, "application/json", "{\"length\":0}");
+    return;
+  }
+  File f = LittleFS.open(LOG_FILE, "r");
+  if (!f) {
+    server.send(200, "application/json", "{\"length\":0}");
+    return;
+  }
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "application/json", "");
+  server.sendContent("{\"length\":" + String(f.size()) + "}");
+  f.close();
+}
+
 // GET /api/history/csv — download stored readings as a CSV file.
 void handleHistoryCsv() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -377,6 +399,7 @@ void setup() {
 
   server.on("/api",               HTTP_GET,    handleApi);
   server.on("/api/history",       HTTP_GET,    handleHistoryJson);
+  server.on("/api/history/length", HTTP_GET,  handleHistoryLength);
   server.on("/api/history/csv",   HTTP_GET,    handleHistoryCsv);
   server.on("/api/history/clear", HTTP_DELETE, handleHistoryClear);
   server.begin();
