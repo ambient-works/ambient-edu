@@ -72,12 +72,54 @@ What you'll learn:
 
 ---
 
+### [`02_local_api.ino`](examples/ambient-edu-local-api/ambient_edu_local_api.ino)
+**Wi-Fi sensor API + history logging**
+
+Connects the board to your Wi-Fi network and starts a lightweight web server. Any device on the same network can request live or historical readings over HTTP — useful for dashboards, spreadsheets, or your own apps.
+
+**Setup:** Edit the `ssid` and `password` variables near the top of the sketch before uploading. (you are limited to 2.4GHz networks)
+
+What you'll learn:
+- Connecting to Wi-Fi with the ESP32
+- Serving HTTP responses with `WebServer`
+- Formatting sensor data as JSON
+- Storing readings to on-device flash with LittleFS
+- Syncing time over the internet with NTP
+
+#### Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api` | Returns the latest sensor reading as JSON |
+| `GET` | `/api/history` | Returns up to 48 hours of readings as a JSON array |
+| `GET` | `/api/history/csv` | Downloads the full history as a CSV file |
+| `DELETE` | `/api/history/clear` | Erases all stored history from the device |
+
+The board logs one reading per minute and keeps up to 2,880 readings (48 hours) in flash storage. Example response from `/api`:
+
+```json
+{
+  "timestamp": "2025-01-01T12:00:00Z",
+  "pm1p0": 3.21,
+  "pm2p5": 4.56,
+  "pm4p0": 5.10,
+  "pm10p0": 6.03,
+  "humidity": 52.30,
+  "temperature": 22.10,
+  "vocIndex": 101.00,
+  "noxIndex": 1.00,
+  "co2": 612
+}
+```
+
+---
+
 ### Future Examples (Coming Soon)
 
 | Example | Description |
 |---|---|
-| `02_data_logger.ino` | Log sensor readings to Serial in CSV format for import into spreadsheets |
-| `03_wifi_dashboard.ino` | Serve a real-time web dashboard over Wi-Fi showing live air quality data |
+| `03_data_logger.ino` | Log sensor readings to Serial in CSV format for import into spreadsheets |
+| `04_wifi_dashboard.ino` | Serve a real-time web dashboard over Wi-Fi showing live air quality data |
 | `04_threshold_buzzer.ino` | Add a piezo buzzer that beeps when air quality drops below a threshold |
 | `05_battery_monitor.ino` | Read the battery level and display remaining charge on Serial |
 | `06_sleep_mode.ino` | Use deep sleep to take periodic readings and extend battery life |

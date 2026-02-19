@@ -50,6 +50,13 @@
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <LittleFS.h>
+
+// ── History / Logging ────────────────────────────────────────
+#define LOG_FILE        "/history.csv"
+#define MAX_LOG_LINES   2880     // 48 h at 1-min intervals
+#define LOG_INTERVAL_MS 60000UL  // Log a reading every 60 s
+
 // ── WiFi Credentials ────────────────────────────────────────
 const char* ssid = "wifi-ssid";
 const char* password = "wifi-password";
@@ -70,6 +77,8 @@ WebServer server(80);
 
 static char errorMessage[64];
 static int16_t error;
+static unsigned long lastLogTime = 0;
+static bool lfsAvailable = false;
 
 // –– API logic –––––––––––––––––––––––––––––––––––––––––––––––
 
@@ -124,6 +133,154 @@ void handleApi() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", json);
 
+}
+
+// –– History helpers –––––––––––––––––––––––––––––––––––––––––
+
+// Return the field at fieldIdx from a comma-separated line.
+String csvFieldAt(const String& line, int fieldIdx) {
+  int count = 0, start = 0;
+  for (int i = 0; i <= (int)line.length(); i++) {
+    if (i == (int)line.length() || line[i] == ',') {
+      if (count == fieldIdx) return line.substring(start, i);
+      count++;
+      start = i + 1;
+    }
+  }
+  return "";
+}
+
+// Remove oldest entries so the log does not exceed MAX_LOG_LINES.
+void trimLogIfNeeded() {
+  if (!lfsAvailable) return;
+  File f = LittleFS.open(LOG_FILE, "r");
+  if (!f) return;
+  int lineCount = 0;
+  while (f.available()) { if (f.read() == '\n') lineCount++; }
+  f.close();
+  if (lineCount <= MAX_LOG_LINES) return;
+
+  int toSkip = lineCount - MAX_LOG_LINES;
+  f = LittleFS.open(LOG_FILE, "r");
+  if (!f) return;
+  File tmp = LittleFS.open("/tmp.csv", "w");
+  if (!tmp) { f.close(); return; }
+
+  int skipped = 0;
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    if (skipped < toSkip) { skipped++; continue; }
+    tmp.println(line);
+  }
+  f.close();
+  tmp.close();
+  LittleFS.remove(LOG_FILE);
+  LittleFS.rename("/tmp.csv", LOG_FILE);
+}
+
+// Append one reading to the CSV log file.
+void logReading(const char* timestamp,
+                float pm1p0, float pm2p5, float pm4p0, float pm10p0,
+                float humidity, float temperature,
+                float vocIndex, float noxIndex, uint16_t co2) {
+  if (!lfsAvailable) return;
+  File f = LittleFS.open(LOG_FILE, "a");
+  if (!f) { Serial.println("Log: failed to open " LOG_FILE); return; }
+  f.printf("%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%u\n",
+           timestamp, pm1p0, pm2p5, pm4p0, pm10p0,
+           humidity, temperature, vocIndex, noxIndex, co2);
+  f.close();
+  trimLogIfNeeded();
+}
+
+// GET /api/history — stream stored readings as a JSON array.
+void handleHistoryJson() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!lfsAvailable) {
+    server.send(503, "application/json", jsonError("Filesystem unavailable"));
+    return;
+  }
+  if (!LittleFS.exists(LOG_FILE)) {
+    server.send(200, "application/json", "[]");
+    return;
+  }
+  File f = LittleFS.open(LOG_FILE, "r");
+  if (!f) {
+    server.send(200, "application/json", "[]");
+    return;
+  }
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "application/json", "");
+  server.sendContent("[");
+
+  bool first = true;
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0) continue;
+
+    if (!first) server.sendContent(",");
+    first = false;
+
+    String json = "{";
+    json += "\"timestamp\":\""  + csvFieldAt(line, 0) + "\",";
+    json += "\"pm1p0\":"        + csvFieldAt(line, 1) + ",";
+    json += "\"pm2p5\":"        + csvFieldAt(line, 2) + ",";
+    json += "\"pm4p0\":"        + csvFieldAt(line, 3) + ",";
+    json += "\"pm10p0\":"       + csvFieldAt(line, 4) + ",";
+    json += "\"humidity\":"     + csvFieldAt(line, 5) + ",";
+    json += "\"temperature\":"  + csvFieldAt(line, 6) + ",";
+    json += "\"vocIndex\":"     + csvFieldAt(line, 7) + ",";
+    json += "\"noxIndex\":"     + csvFieldAt(line, 8) + ",";
+    json += "\"co2\":"          + csvFieldAt(line, 9);
+    json += "}";
+    server.sendContent(json);
+  }
+  server.sendContent("]");
+  f.close();
+}
+
+// GET /api/history/csv — download stored readings as a CSV file.
+void handleHistoryCsv() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Content-Disposition",
+                    "attachment; filename=\"ambient_history.csv\"");
+  if (!lfsAvailable) {
+    server.send(503, "text/plain", "Filesystem unavailable");
+    return;
+  }
+  if (!LittleFS.exists(LOG_FILE)) {
+    server.send(404, "text/plain", "No history available");
+    return;
+  }
+  File f = LittleFS.open(LOG_FILE, "r");
+  if (!f) {
+    server.send(500, "text/plain", "Failed to open log file");
+    return;
+  }
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/csv", "");
+  server.sendContent(
+    "timestamp,pm1p0,pm2p5,pm4p0,pm10p0,humidity,temperature,vocIndex,noxIndex,co2\n");
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    server.sendContent(line + "\n");
+  }
+  f.close();
+}
+
+// DELETE /api/history/clear — erase the log file.
+void handleHistoryClear() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!lfsAvailable) {
+    server.send(503, "application/json", jsonError("Filesystem unavailable"));
+    return;
+  }
+  if (LittleFS.remove(LOG_FILE)) {
+    server.send(200, "application/json", "{\"message\":\"History cleared\"}");
+  } else {
+    server.send(200, "application/json", "{\"message\":\"No history to clear\"}");
+  }
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -198,6 +355,30 @@ void setup() {
 
   Serial.println();
 
+  // ── LittleFS ──────────────────────────────────────────────
+  // Try mounting without auto-format first, then reformat explicitly if needed.
+  // This is more reliable than formatOnFail=true on ESP32-C6.
+  if (LittleFS.begin(false)) {
+    lfsAvailable = true;
+    Serial.println("LittleFS mounted.");
+  } else {
+    Serial.println("LittleFS mount failed — formatting...");
+    if (LittleFS.format()) {
+      if (LittleFS.begin(false)) {
+        lfsAvailable = true;
+        Serial.println("LittleFS formatted and mounted.");
+      } else {
+        Serial.println("LittleFS mount failed after format — history disabled.");
+      }
+    } else {
+      Serial.println("LittleFS format failed — history disabled.");
+    }
+  }
+
+  server.on("/api",               HTTP_GET,    handleApi);
+  server.on("/api/history",       HTTP_GET,    handleHistoryJson);
+  server.on("/api/history/csv",   HTTP_GET,    handleHistoryCsv);
+  server.on("/api/history/clear", HTTP_DELETE, handleHistoryClear);
   server.begin();
   Serial.print("Web server started on: http://");
   Serial.print(WiFi.localIP());
@@ -212,7 +393,27 @@ void loop() {
 
   server.handleClient();
 
-  delay(1000);  // SEN66 updates roughly every second
+  unsigned long now = millis();
+  if (now - lastLogTime >= LOG_INTERVAL_MS) {
+    lastLogTime = now;
 
-  server.on("/api", HTTP_GET, handleApi);
+    float pm1p0 = 0, pm2p5 = 0, pm4p0 = 0, pm10p0 = 0;
+    float humidity = 0, temperature = 0;
+    float vocIndex = 0, noxIndex = 0;
+    uint16_t co2 = 0;
+
+    int16_t logErr = sensor.readMeasuredValues(
+        pm1p0, pm2p5, pm4p0, pm10p0,
+        humidity, temperature, vocIndex, noxIndex, co2);
+
+    if (logErr == NO_ERROR) {
+      time_t t = time(nullptr);
+      struct tm* ti = localtime(&t);
+      char ts[25];
+      strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", ti);
+      logReading(ts, pm1p0, pm2p5, pm4p0, pm10p0, humidity, temperature, vocIndex, noxIndex, co2);
+    }
+  }
+
+  delay(100);  // Short delay keeps server responsive
 }
