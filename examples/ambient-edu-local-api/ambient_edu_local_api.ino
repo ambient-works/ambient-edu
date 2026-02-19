@@ -51,8 +51,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
 // ── WiFi Credentials ────────────────────────────────────────
-const char* ssid = "***REMOVED***"; //"wifi-ssid";
-const char* password = "***REMOVED***";
+const char* ssid = "wifi-ssid";
+const char* password = "wifi-password";
 
 // ─────────────────────────────────────────────────────────────
 #include <Arduino.h>
