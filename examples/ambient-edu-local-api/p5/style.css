@@ -1,0 +1,183 @@
+/* ─────────────────────────────────────────────
+   AMBIENT — p5.js demo stylesheet
+   Aesthetic: industrial / utilitarian lab tool
+   Font: DM Mono + DM Sans via Google Fonts
+───────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg:        #0d0f0e;
+  --bg2:       #141716;
+  --bg3:       #1c1f1d;
+  --border:    #2a2e2c;
+  --text:      #d4d9d6;
+  --text-dim:  #5a6360;
+  --accent:    #39e07a;   /* green — good air */
+  --warn:      #f0b429;   /* yellow */
+  --danger:    #f55050;   /* red */
+  --blue:      #4ac8f0;
+  --mono:      'DM Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────── */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-right: 14px;
+}
+
+.subtitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.connected    { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.dot.disconnected { background: var(--text-dim); }
+.dot.connecting   { background: var(--warn); animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Config bar ─────────────────────────────── */
+.config-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.config-bar label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.config-bar input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  width: 180px;
+  outline: none;
+  transition: border-color .2s;
+}
+.config-bar input:focus { border-color: var(--accent); }
+
+.config-bar button {
+  background: var(--accent);
+  color: #0d0f0e;
+  border: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 18px;
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: opacity .15s;
+}
+.config-bar button:hover { opacity: 0.85; }
+
+.hint {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ── Sketch cards ───────────────────────────── */
+main { padding: 32px; }
+
+.sketches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 28px;
+}
+
+.sketch-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.card-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+
+.sketch-card canvas {
+  display: block;
+}
+
+.card-desc {
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  line-height: 1.7;
+}
+
+.card-desc code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--blue);
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 2px;
+}

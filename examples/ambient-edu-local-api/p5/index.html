@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ambient Air Quality — p5.js Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <span class="logo">&#9632; AMBIENT</span>
+      <span class="subtitle">air quality monitor</span>
+    </div>
+    <div class="header-right">
+      <span id="status-dot" class="dot disconnected"></span>
+      <span id="status-label">not connected</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="config-bar">
+      <label for="ip-input">Device IP</label>
+      <input id="ip-input" type="text" value="192.168.1.100" spellcheck="false"/>
+      <button id="connect-btn">Connect</button>
+      <span class="hint">→ point this at your ESP32's IP address</span>
+    </section>
+
+    <section class="sketches">
+
+      <!-- Live Reading -->
+      <div class="sketch-card" id="card-live">
+        <div class="card-label">01 — Live Reading</div>
+        <div id="sketch-live"></div>
+        <p class="card-desc">
+          Calls <code>GET /api</code> every 2 seconds and draws the latest
+          PM2.5, CO₂, temperature and humidity values to the canvas.
+          A good first sketch — fetch one endpoint, display the values.
+        </p>
+      </div>
+
+      <!-- History Graph -->
+      <div class="sketch-card" id="card-history">
+        <div class="card-label">02 — History Graph</div>
+        <div id="sketch-history"></div>
+        <p class="card-desc">
+          Calls <code>GET /api/history</code> once (then refreshes every
+          10 s) and plots CO₂ and PM2.5 as line graphs over time.
+          Demonstrates working with arrays of JSON objects.
+        </p>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- p5.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.min.js"></script>
+  <!-- Fetch helpers -->
+  <script src="mock.js"></script>
+  <!-- The two p5 sketches -->
+  <script src="sketch-live.js"></script>
+  <!-- <script src="sketch-history.js"></script> -->
+  <!-- UI glue -->
+  <script src="app.js"></script>
+</body>
+</html>

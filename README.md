@@ -72,11 +72,25 @@ What you'll learn:
 
 ---
 
+### [`02_data_logger.ino`](examples/02_data_logger.ino)
+**Log sensor data to flash memory (LittleFS)**
+
+Reads the SEN66 every 10 seconds and appends a CSV row to a file stored on the ESP32's built-in flash filesystem — no SD card needed. On boot it prints any previously saved data so you can copy/paste it into a spreadsheet. The LED blinks blue on each write.
+
+What you'll learn:
+- Writing and reading files with LittleFS
+- CSV formatting for data analysis
+- Append mode vs overwrite
+- Simple serial commands (`print`, `clear`)
+
+No extra libraries needed — LittleFS is built into the ESP32 Arduino core.
+
+---
+
 ### Future Examples (Coming Soon)
 
 | Example | Description |
 |---|---|
-| `02_data_logger.ino` | Log sensor readings to Serial in CSV format for import into spreadsheets |
 | `03_wifi_dashboard.ino` | Serve a real-time web dashboard over Wi-Fi showing live air quality data |
 | `04_threshold_buzzer.ino` | Add a piezo buzzer that beeps when air quality drops below a threshold |
 | `05_battery_monitor.ino` | Read the battery level and display remaining charge on Serial |

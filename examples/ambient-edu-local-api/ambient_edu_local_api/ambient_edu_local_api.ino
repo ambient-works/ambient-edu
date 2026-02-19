@@ -51,8 +51,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
 // ── WiFi Credentials ────────────────────────────────────────
-const char* ssid = "wifi-ssid";
-const char* password = "wifi-password";
+const char* ssid = "TP-Link_8FBA";
+const char* password = "61780316";
 
 // ─────────────────────────────────────────────────────────────
 #include <Arduino.h>
