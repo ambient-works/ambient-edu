@@ -58,6 +58,14 @@
 #include <Adafruit_NeoPixel.h>
 #include <SensirionI2cSen66.h>
 
+// ── Optional: Battery Monitor (SparkFun C6 has MAX17048) ────
+// Uncomment the next line and install "SparkFun MAX1704x Fuel Gauge Arduino Library"
+// #define ENABLE_BATTERY
+#ifdef ENABLE_BATTERY
+  #include <SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library.h>
+  SFE_MAX1704X gauge(MAX1704X_MAX17048);
+#endif
+
 #ifdef NO_ERROR
 #undef NO_ERROR
 #endif
@@ -134,6 +142,16 @@ void setup() {
     return;
   }
 
+  // ── Battery gauge (optional) ──────────────────────────────
+#ifdef ENABLE_BATTERY
+  if (gauge.begin() == false) {
+    Serial.println("MAX17048 not found — battery monitoring disabled.");
+  } else {
+    gauge.quickStart();
+    Serial.printf("Battery: %.1f%%  %.2fV\n", gauge.getSOC(), gauge.getVoltage());
+  }
+#endif
+
   Serial.println("\nSensor started — readings below.");
   Serial.println("NOTE: VOC/NOx need ~60 s to warm up.\n");
 }
@@ -169,6 +187,9 @@ void loop() {
   Serial.printf("  NOx:    %.0f (index)\n", noxIndex);
   Serial.printf("  Temp:   %.1f °C\n",     temperature);
   Serial.printf("  RH:     %.1f %%\n",     humidity);
+#ifdef ENABLE_BATTERY
+  Serial.printf("  Batt:   %.1f %% (%.2fV)\n", gauge.getSOC(), gauge.getVoltage());
+#endif
 
   // ── LED colour based on PM2.5 ─────────────────────────────
   //
