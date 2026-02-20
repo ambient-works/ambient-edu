@@ -2,9 +2,9 @@
  * Ambient Edu — BLE Broadcast
  *
  * Reads the SEN66 sensor and broadcasts every measurement over
- * Bluetooth Low Energy (BLE).  Any BLE scanner app — such as
- * nRF Connect or LightBlue — can see the values immediately,
- * no custom app required.
+ * Bluetooth Low Energy (BLE) using the ArduinoBLE library.
+ * Any BLE scanner app — such as nRF Connect or LightBlue — can
+ * see the values immediately, no custom app required.
  *
  * DEVICE ID
  * ─────────
@@ -45,10 +45,10 @@
  *   │ Temp  (f32)│ Humi  (f32)│   °C / %RH
  *   └────────────┴────────────┘
  *
- *   Battery (UUID ...0013, optional)   8 bytes
- *   ┌────────────┬────────────┐
- *   │ SoC   (f32)│ Volts (f32)│   % / V
- *   └────────────┴────────────┘
+ *   Battery (UUID ...0013, optional)   12 bytes
+ *   ┌────────────┬────────────┬────────────┐
+ *   │ SoC   (f32)│ Volts (f32)│ Rate  (f32)│   % / V / %hr
+ *   └────────────┴────────────┴────────────┘
  *
  *   f32 = 4-byte IEEE 754 float, little-endian
  *   u16 = 2-byte unsigned integer, little-endian
@@ -58,7 +58,8 @@
  * Uncomment ONE of the two #define lines below to match your hardware.
  *
  * Board:    ESP32-C6 (select "ESP32C6 Dev Module" in Arduino IDE)
- * Requires: - Adafruit NeoPixel   (Library Manager)
+ * Requires: - ArduinoBLE          (Library Manager — v1.3.6+)
+ *           - Adafruit NeoPixel   (Library Manager)
  *           - Sensirion I2C SEN66 (Library Manager)
  *           - Sensirion Core      (installed automatically with the above)
  */
@@ -104,18 +105,16 @@
 #include <Wire.h>
 #include <Adafruit_NeoPixel.h>
 #include <SensirionI2cSen66.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLE2902.h>
+#include <ArduinoBLE.h>
 
 // ── Optional: Battery Monitor (SparkFun C6 has MAX17048) ────
 // Uncomment the next line and install "Adafruit MAX1704X" from Library Manager
 // #define ENABLE_BATTERY
 #ifdef ENABLE_BATTERY
   #include <Adafruit_MAX1704X.h>
-  Adafruit_MAX17048 battery;
-  float battPercent()  { return min(battery.cellPercent(), 100.0f); }
-  bool  battCharging() { return battery.chargeRate() > 0.1f; }
+  Adafruit_MAX17048 battGauge;
+  float battPercent()  { return min(battGauge.cellPercent(), 100.0f); }
+  bool  battCharging() { return battGauge.chargeRate() > 0.1f; }
 #endif
 
 #ifdef NO_ERROR
@@ -123,12 +122,22 @@
 #endif
 #define NO_ERROR 0
 
-// ── BLE UUIDs ───────────────────────────────────────────────
-#define SERVICE_UUID     "12340001-1234-1234-1234-123456789abc"
-#define CHAR_PART_UUID   "12340010-1234-1234-1234-123456789abc"  // Particles
-#define CHAR_GAS_UUID    "12340011-1234-1234-1234-123456789abc"  // Gases
-#define CHAR_ENV_UUID    "12340012-1234-1234-1234-123456789abc"  // Environment
-#define CHAR_BATT_UUID   "12340013-1234-1234-1234-123456789abc"  // Battery (opt)
+// ── BLE service + characteristics ───────────────────────────
+BLEService sensorService("12340001-1234-1234-1234-123456789abc");
+
+BLECharacteristic charParticles("12340010-1234-1234-1234-123456789abc",
+                                BLERead | BLENotify, 16);   // 4 × float
+
+BLECharacteristic charGases("12340011-1234-1234-1234-123456789abc",
+                            BLERead | BLENotify, 10);       // uint16 + 2 × float
+
+BLECharacteristic charEnv("12340012-1234-1234-1234-123456789abc",
+                          BLERead | BLENotify, 8);           // 2 × float
+
+#ifdef ENABLE_BATTERY
+BLECharacteristic charBattery("12340013-1234-1234-1234-123456789abc",
+                              BLERead | BLENotify, 12);     // 3 × float
+#endif
 
 // ── Globals ─────────────────────────────────────────────────
 Adafruit_NeoPixel pixel(NUM_PIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -137,30 +146,7 @@ SensirionI2cSen66 sensor;
 static char errorMessage[64];
 static int16_t error;
 
-bool deviceConnected    = false;
-bool oldDeviceConnected = false;
-
-BLECharacteristic *charParticles;
-BLECharacteristic *charGases;
-BLECharacteristic *charEnv;
-#ifdef ENABLE_BATTERY
-BLECharacteristic *charBattery;
-#endif
-
-// ── BLE callbacks ───────────────────────────────────────────
-class ServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* s)    { deviceConnected = true;  Serial.println("BLE client connected"); }
-  void onDisconnect(BLEServer* s) { deviceConnected = false; Serial.println("BLE client disconnected"); }
-};
-
 // ── Helpers ─────────────────────────────────────────────────
-BLECharacteristic* addChar(BLEService* svc, const char* uuid) {
-  BLECharacteristic* c = svc->createCharacteristic(
-      uuid,
-      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-  c->addDescriptor(new BLE2902());
-  return c;
-}
 
 // Return a deterministic colour from the device ID (hue wheel).
 uint32_t idColour(uint8_t id) {
@@ -179,7 +165,7 @@ void flashId(uint8_t id) {
     pixel.show();
     delay(200);
   }
-  // Leave LED on solid at low brightness as a steady indicator
+  // Leave LED on solid as a steady indicator
   pixel.setPixelColor(0, c);
   pixel.show();
 }
@@ -254,33 +240,32 @@ void setup() {
 
   // ── Battery gauge (optional) ──────────────────────────────
 #ifdef ENABLE_BATTERY
-  if (!battery.begin()) {
+  if (!battGauge.begin()) {
     Serial.println("MAX17048 not found — battery monitoring disabled.");
   } else {
-    Serial.printf("Battery: %.0f%%  %.2fV\n", battPercent(), battery.cellVoltage());
+    Serial.printf("Battery: %.0f%%  %.2fV\n", battPercent(), battGauge.cellVoltage());
   }
 #endif
 
   // ── BLE ───────────────────────────────────────────────────
-  BLEDevice::init(bleName.c_str());
-  BLEServer* pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new ServerCallbacks());
+  if (!BLE.begin()) {
+    Serial.println("BLE init failed!");
+    while (1);
+  }
 
-  BLEService* svc = pServer->createService(BLEUUID(SERVICE_UUID), 20);
+  BLE.setLocalName(bleName.c_str());
+  BLE.setDeviceName(bleName.c_str());
+  BLE.setAdvertisedService(sensorService);
 
-  charParticles = addChar(svc, CHAR_PART_UUID);
-  charGases     = addChar(svc, CHAR_GAS_UUID);
-  charEnv       = addChar(svc, CHAR_ENV_UUID);
+  sensorService.addCharacteristic(charParticles);
+  sensorService.addCharacteristic(charGases);
+  sensorService.addCharacteristic(charEnv);
 #ifdef ENABLE_BATTERY
-  charBattery   = addChar(svc, CHAR_BATT_UUID);
+  sensorService.addCharacteristic(charBattery);
 #endif
 
-  svc->start();
-
-  BLEAdvertising* adv = BLEDevice::getAdvertising();
-  adv->addServiceUUID(SERVICE_UUID);
-  adv->setScanResponse(true);
-  BLEDevice::startAdvertising();
+  BLE.addService(sensorService);
+  BLE.advertise();
 
   Serial.printf("BLE advertising as \"%s\"\n", bleName.c_str());
   Serial.println("Open nRF Connect or LightBlue to see the data.\n");
@@ -288,6 +273,9 @@ void setup() {
 
 // ═════════════════════════════════════════════════════════════
 void loop() {
+  // Let ArduinoBLE handle connections
+  BLE.poll();
+
   float pm1p0 = 0, pm2p5 = 0, pm4p0 = 0, pm10p0 = 0;
   float humidity = 0, temperature = 0;
   float vocIndex = 0, noxIndex = 0;
@@ -306,7 +294,7 @@ void loop() {
     return;
   }
 
-  // ── Pack & notify: Particles (16 bytes) ───────────────────
+  // ── Pack & write: Particles (16 bytes) ────────────────────
   // [PM1.0 f32] [PM2.5 f32] [PM4.0 f32] [PM10 f32]
   {
     uint8_t buf[16];
@@ -314,62 +302,51 @@ void loop() {
     memcpy(buf + 4,  &pm2p5,  4);
     memcpy(buf + 8,  &pm4p0,  4);
     memcpy(buf + 12, &pm10p0, 4);
-    charParticles->setValue(buf, 16);
-    if (deviceConnected) charParticles->notify();
+    charParticles.writeValue(buf, 16);
   }
 
-  // ── Pack & notify: Gases (10 bytes) ───────────────────────
+  // ── Pack & write: Gases (10 bytes) ────────────────────────
   // [CO2 u16] [VOC f32] [NOx f32]
   {
     uint8_t buf[10];
     memcpy(buf + 0, &co2,      2);
     memcpy(buf + 2, &vocIndex, 4);
     memcpy(buf + 6, &noxIndex, 4);
-    charGases->setValue(buf, 10);
-    if (deviceConnected) charGases->notify();
+    charGases.writeValue(buf, 10);
   }
 
-  // ── Pack & notify: Environment (8 bytes) ──────────────────
+  // ── Pack & write: Environment (8 bytes) ───────────────────
   // [Temperature f32] [Humidity f32]
   {
     uint8_t buf[8];
     memcpy(buf + 0, &temperature, 4);
     memcpy(buf + 4, &humidity,    4);
-    charEnv->setValue(buf, 8);
-    if (deviceConnected) charEnv->notify();
+    charEnv.writeValue(buf, 8);
   }
 
-  // ── Pack & notify: Battery (8 bytes, optional) ────────────
+  // ── Pack & write: Battery (12 bytes, optional) ────────────
 #ifdef ENABLE_BATTERY
   {
     float soc   = battPercent();
-    float volts = battery.cellVoltage();
-    float rate  = battery.chargeRate();
+    float volts = battGauge.cellVoltage();
+    float rate  = battGauge.chargeRate();
     uint8_t buf[12];
     memcpy(buf + 0, &soc,   4);
     memcpy(buf + 4, &volts, 4);
     memcpy(buf + 8, &rate,  4);
-    charBattery->setValue(buf, 12);
-    if (deviceConnected) charBattery->notify();
+    charBattery.writeValue(buf, 12);
   }
 #endif
 
   // ── Serial output ─────────────────────────────────────────
+  bool connected = BLE.connected();
   Serial.println("────────────────────────────────────");
   Serial.printf("  PM2.5: %.1f µg/m³   CO2: %u ppm\n", pm2p5, co2);
   Serial.printf("  Temp:  %.1f °C      RH:  %.1f %%\n", temperature, humidity);
 #ifdef ENABLE_BATTERY
   Serial.printf("  Battery: %.0f%% %.2fV %s\n",
-                battPercent(), battery.cellVoltage(),
+                battPercent(), battGauge.cellVoltage(),
                 battCharging() ? "[charging]" : "[discharging]");
 #endif
-  if (deviceConnected) Serial.println("  [BLE client connected]");
-
-  // ── Handle reconnection ───────────────────────────────────
-  if (!deviceConnected && oldDeviceConnected) {
-    delay(500);
-    BLEDevice::startAdvertising();
-    Serial.println("Restarted advertising");
-  }
-  oldDeviceConnected = deviceConnected;
+  if (connected) Serial.println("  [BLE client connected]");
 }

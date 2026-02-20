@@ -44,6 +44,7 @@ Open **Sketch → Include Library → Manage Libraries** and install:
 
 - **Adafruit NeoPixel** — for the onboard LED
 - **Sensirion I2C SEN66** — for the SEN66 sensor (also installs Sensirion Core automatically)
+- **ArduinoBLE** — for the BLE broadcast example
 - **Adafruit MAX1704X** *(optional)* — for battery level monitoring
 
 ### 4. Connect the Hardware
