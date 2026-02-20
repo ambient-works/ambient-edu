@@ -1,0 +1,2 @@
+# requirements.txt — Ambient Edu BLE Simulator
+bless>=0.2.5
