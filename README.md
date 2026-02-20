@@ -44,6 +44,7 @@ Open **Sketch → Include Library → Manage Libraries** and install:
 
 - **Adafruit NeoPixel** — for the onboard LED
 - **Sensirion I2C SEN66** — for the SEN66 sensor (also installs Sensirion Core automatically)
+- **Adafruit MAX1704X** *(optional)* — for battery level monitoring
 
 ### 4. Connect the Hardware
 
@@ -59,7 +60,7 @@ Open one of the example sketches from the [`examples/`](examples/) folder, verif
 
 ## Examples
 
-### [`01_sensor_read.ino`](examples/01_sensor_read.ino)
+### [`01-sensor-read.ino`](examples/01-sensor-read/01-sensor-read.ino)
 **Read sensor data + LED colour alert**
 
 Reads all 9 measurements from the SEN66 and prints them to Serial Monitor every second. A simple `if/else` block changes the LED colour based on PM2.5 levels — edit the thresholds to experiment with different pollutants.
@@ -72,7 +73,7 @@ What you'll learn:
 
 ---
 
-### [`02_local_api.ino`](examples/ambient-edu-local-api/ambient_edu_local_api.ino)
+### [`02-local-api.ino`](examples/02-local-api/02-local-api.ino)
 **Wi-Fi sensor API + history logging**
 
 Connects the board to your Wi-Fi network and starts a lightweight web server. Any device on the same network can request live or historical readings over HTTP — useful for dashboards, spreadsheets, or your own apps.
@@ -114,17 +115,70 @@ The board logs one reading per minute and keeps up to 2,880 readings (48 hours) 
 
 ---
 
-### Future Examples (Coming Soon)
+### [`03-ble-broadcast.ino`](examples/03-ble-broadcast/03-ble-broadcast.ino)
+**Broadcast sensor data over Bluetooth Low Energy**
 
-| Example | Description |
-|---|---|
-| `03_data_logger.ino` | Log sensor readings to Serial in CSV format for import into spreadsheets |
-| `04_wifi_dashboard.ino` | Serve a real-time web dashboard over Wi-Fi showing live air quality data |
-| `04_threshold_buzzer.ino` | Add a piezo buzzer that beeps when air quality drops below a threshold |
-| `05_battery_monitor.ino` | Read the battery level and display remaining charge on Serial |
-| `06_sleep_mode.ino` | Use deep sleep to take periodic readings and extend battery life |
-| `07_ble_broadcast.ino` | Broadcast sensor data over Bluetooth Low Energy for phone apps to read |
-| `08_multi_sensor_compare.ino` | Compare readings from multiple pollutants and determine the worst one |
+Advertises the board as **"Ambient Edu XX"** (where XX is your device ID) and exposes sensor readings over BLE. Any BLE scanner app (nRF Connect, LightBlue, etc.) can read the values immediately — no custom app needed.
+
+**Setup:** Change `DEVICE_ID` (1–99) at the top of the sketch so each student's board gets a unique BLE name and LED colour. The LED flashes on startup so you can visually identify your board.
+
+Sensor data is grouped into three characteristics so an app only needs to subscribe to the groups it cares about:
+
+What you'll learn:
+- Setting up a BLE peripheral with GATT services
+- Packing multiple values into a single characteristic
+- Encoding sensor data as raw bytes (little-endian floats)
+- Handling client connect/disconnect events
+
+#### Characteristic Map
+
+Service UUID: `12340001-1234-1234-1234-123456789abc`
+
+**Particles** — UUID `...0010` — 16 bytes
+
+| Offset | Field | Type | Unit |
+|---|---|---|---|
+| 0 | PM 1.0 | float (4B) | µg/m³ |
+| 4 | PM 2.5 | float (4B) | µg/m³ |
+| 8 | PM 4.0 | float (4B) | µg/m³ |
+| 12 | PM 10 | float (4B) | µg/m³ |
+
+**Gases** — UUID `...0011` — 10 bytes
+
+| Offset | Field | Type | Unit |
+|---|---|---|---|
+| 0 | CO₂ | uint16 (2B) | ppm |
+| 2 | VOC Index | float (4B) | index |
+| 6 | NOx Index | float (4B) | index |
+
+**Environment** — UUID `...0012` — 8 bytes
+
+| Offset | Field | Type | Unit |
+|---|---|---|---|
+| 0 | Temperature | float (4B) | °C |
+| 4 | Humidity | float (4B) | %RH |
+
+**Battery** *(optional)* — UUID `...0013` — 12 bytes
+
+| Offset | Field | Type | Unit |
+|---|---|---|---|
+| 0 | State of Charge | float (4B) | % (capped at 100) |
+| 4 | Voltage | float (4B) | V |
+| 8 | Charge Rate | float (4B) | %/hr (positive = charging) |
+
+All multi-byte values are **little-endian** (float = IEEE 754, uint16 = unsigned).
+
+---
+
+### Battery Monitoring (Optional)
+
+The SparkFun ESP32-C6 Thing Plus has a MAX17048 fuel gauge on the I²C bus. All example sketches include an **optional** battery monitoring feature.
+
+To enable it:
+1. Install **Adafruit MAX1704X** from Library Manager
+2. Uncomment `#define ENABLE_BATTERY` near the top of the sketch
+
+When enabled, battery percentage and voltage are printed to Serial (and included in API responses / BLE characteristics where applicable).
 
 ---
 

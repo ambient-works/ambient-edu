@@ -59,14 +59,11 @@
 #include <SensirionI2cSen66.h>
 
 // ── Optional: Battery Monitor (SparkFun C6 has MAX17048) ────
-// Uncomment the next line and install "Adafruit MAX1704X" from Library Manager
-#define ENABLE_BATTERY
+// Uncomment the next line and install "SparkFun MAX1704x Fuel Gauge Arduino Library"
+// #define ENABLE_BATTERY
 #ifdef ENABLE_BATTERY
-  #include <Adafruit_MAX1704X.h>
-  Adafruit_MAX17048 battery;
-  // MAX17048 can report >100% — clamp it.
-  float battPercent()  { return min(battery.cellPercent(), 100.0f); }
-  bool  battCharging() { return battery.chargeRate() > 0.1f; }
+  #include <SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library.h>
+  SFE_MAX1704X gauge(MAX1704X_MAX17048);
 #endif
 
 #ifdef NO_ERROR
@@ -147,10 +144,11 @@ void setup() {
 
   // ── Battery gauge (optional) ──────────────────────────────
 #ifdef ENABLE_BATTERY
-  if (!battery.begin()) {
+  if (gauge.begin() == false) {
     Serial.println("MAX17048 not found — battery monitoring disabled.");
   } else {
-    Serial.printf("Battery: %.0f%%  %.2fV\n", battPercent(), battery.cellVoltage());
+    gauge.quickStart();
+    Serial.printf("Battery: %.1f%%  %.2fV\n", gauge.getSOC(), gauge.getVoltage());
   }
 #endif
 
@@ -190,9 +188,7 @@ void loop() {
   Serial.printf("  Temp:   %.1f °C\n",     temperature);
   Serial.printf("  RH:     %.1f %%\n",     humidity);
 #ifdef ENABLE_BATTERY
-  Serial.printf("  Batt:   %.0f%% (%.2fV) %s\n",
-                battPercent(), battery.cellVoltage(),
-                battCharging() ? "[charging]" : "[discharging]");
+  Serial.printf("  Batt:   %.1f %% (%.2fV)\n", gauge.getSOC(), gauge.getVoltage());
 #endif
 
   // ── LED colour based on PM2.5 ─────────────────────────────
