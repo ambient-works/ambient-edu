@@ -204,35 +204,49 @@ Install **ESPSupabase** from Library Manager in addition to the libraries listed
 
 #### Database Tables
 
+Make sure to **Disable** RLS on both tables
+
 **`devices`** — one row per device+student combination, upserted on first connection:
 
-| Column | Type | Description |
-|---|---|---|
-| `device_id` | text | MAC address (hex, no separators) |
-| `student_name` | text | Student's name |
-| `student_email` | text | Student's email |
-| `kit_number` | text | Kit identifier |
-| `latitude` | float | Location latitude |
-| `longitude` | float | Location longitude |
-| `location_description` | text | Human-readable location |
-| `last_seen` | timestamptz | ISO 8601 timestamp of last reading |
+```SQL
+create table public.devices (
+  device_id text not null,
+  student_name text null,
+  student_email text null,
+  kit_number text null,
+  location_description text null,
+  latitude numeric null,
+  longitude numeric null,
+  last_seen timestamp with time zone null,
+  created_at timestamp with time zone not null default now(),
+  id uuid not null default gen_random_uuid (),
+  constraint devices_pkey primary key (id),
+  constraint devices_device_student_unique unique (device_id, student_email)
+) TABLESPACE pg_default;
+```
 
 **`sensor_readings`** — one row per reading (logged every 60 seconds):
 
-| Column | Type | Description |
-|---|---|---|
-| `device_id` | text | MAC address |
-| `device_uuid` | uuid | Foreign key to `devices.id` |
-| `timestamp` | timestamptz | ISO 8601 UTC timestamp |
-| `pm1_0` | float | PM1.0 (µg/m³) |
-| `pm2_5` | float | PM2.5 (µg/m³) |
-| `pm4_0` | float | PM4.0 (µg/m³) |
-| `pm10_0` | float | PM10 (µg/m³) |
-| `temperature` | float | Temperature (°C) |
-| `humidity` | float | Relative humidity (%RH) |
-| `co2` | integer | CO₂ (ppm) |
-| `voc_index` | float | VOC index |
-| `nox_index` | float | NOx index |
+```SQL
+create table public.sensor_readings (
+  id uuid not null default gen_random_uuid (),
+  device_id text null,
+  timestamp timestamp with time zone null,
+  pm1_0 numeric null,
+  pm2_5 numeric null,
+  pm4_0 numeric null,
+  pm10_0 numeric null,
+  temperature numeric null,
+  humidity numeric null,
+  co2 numeric null,
+  nox_index numeric null,
+  voc_index numeric null,
+  created_at timestamp with time zone not null default now(),
+  device_uuid uuid null,
+  constraint sensor_readings_pkey primary key (id),
+  constraint sensor_readings_device_uuid_fkey foreign KEY (device_uuid) references devices (id)
+) TABLESPACE pg_default;
+```
 
 ---
 
