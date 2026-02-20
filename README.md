@@ -45,6 +45,7 @@ Open **Sketch → Include Library → Manage Libraries** and install:
 - **Adafruit NeoPixel** — for the onboard LED
 - **Sensirion I2C SEN66** — for the SEN66 sensor (also installs Sensirion Core automatically)
 - **ArduinoBLE** — for the BLE broadcast example
+- **ESPSupabase** — for the Supabase data logger example
 - **Adafruit MAX1704X** *(optional)* — for battery level monitoring
 
 ### 4. Connect the Hardware
@@ -168,6 +169,70 @@ Service UUID: `12340001-1234-1234-1234-123456789abc`
 | 8 | Charge Rate | float (4B) | %/hr (positive = charging) |
 
 All multi-byte values are **little-endian** (float = IEEE 754, uint16 = unsigned).
+
+---
+
+### [`04-supabase.ino`](examples/04-supabase/04-supabase.ino)
+**Push sensor data to a Supabase database**
+
+Reads all 9 measurements from the SEN66 every minute and uploads them to a [Supabase](https://supabase.com) database via the REST API. Device metadata (student name, email, location) is registered in a `devices` table on first run and kept up to date on each cycle.
+
+**Setup:** Edit the student config and Supabase credentials near the top of the sketch before uploading:
+
+```cpp
+const char* STUDENT_NAME  = "Your Name";
+const char* STUDENT_EMAIL = "you@example.com";
+
+const float LOCATION_LATITUDE    = 51.5074;
+const float LOCATION_LONGITUDE   = -0.1278;
+const char* LOCATION_DESCRIPTION = "Classroom 3B";
+
+const char* SUPABASE_URL      = "https://<project-ref>.supabase.co";
+const char* SUPABASE_ANON_KEY = "<anon-key>";
+```
+
+What you'll learn:
+- Sending HTTP POST requests to a REST API
+- Formatting sensor data as JSON
+- Using NTP to timestamp readings
+- Registering and tracking devices in a database
+- Deriving a unique device ID from the MAC address
+
+#### Required Library
+
+Install **ESPSupabase** from Library Manager in addition to the libraries listed in [Getting Started](#3-install-required-libraries).
+
+#### Database Tables
+
+**`devices`** — one row per device+student combination, upserted on first connection:
+
+| Column | Type | Description |
+|---|---|---|
+| `device_id` | text | MAC address (hex, no separators) |
+| `student_name` | text | Student's name |
+| `student_email` | text | Student's email |
+| `kit_number` | text | Kit identifier |
+| `latitude` | float | Location latitude |
+| `longitude` | float | Location longitude |
+| `location_description` | text | Human-readable location |
+| `last_seen` | timestamptz | ISO 8601 timestamp of last reading |
+
+**`sensor_readings`** — one row per reading (logged every 60 seconds):
+
+| Column | Type | Description |
+|---|---|---|
+| `device_id` | text | MAC address |
+| `device_uuid` | uuid | Foreign key to `devices.id` |
+| `timestamp` | timestamptz | ISO 8601 UTC timestamp |
+| `pm1_0` | float | PM1.0 (µg/m³) |
+| `pm2_5` | float | PM2.5 (µg/m³) |
+| `pm4_0` | float | PM4.0 (µg/m³) |
+| `pm10_0` | float | PM10 (µg/m³) |
+| `temperature` | float | Temperature (°C) |
+| `humidity` | float | Relative humidity (%RH) |
+| `co2` | integer | CO₂ (ppm) |
+| `voc_index` | float | VOC index |
+| `nox_index` | float | NOx index |
 
 ---
 
